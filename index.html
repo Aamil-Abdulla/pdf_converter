@@ -1,0 +1,52 @@
+<!DOCTYPE html> 
+<html>
+<head>
+    <title>PDF Converter</title>
+</head>
+<body>
+    <h1>PDF Converter</h1>
+    <input type="file" id="FileInput">
+    <input type="text" id="Question" placeholder="Ask a question about the PDF">
+    <input type="password" id="ApiKey" placeholder="Enter Gemini API Key">
+    
+    <button onclick="upload()">Upload & Ask</button>
+    <div id="Result" style="margin-top: 20px; white-space: pre-wrap;"></div>
+
+    <script>
+    async function upload(){
+        const resultDiv = document.getElementById("Result");
+        const file = document.getElementById("FileInput").files[0];
+        const question = document.getElementById("Question").value;
+        const apiKey = document.getElementById("ApiKey").value;
+
+        if(!file || !question || !apiKey) {
+            alert("Please provide a file, a question, and your API key.");
+            return;
+        }
+
+        resultDiv.innerHTML = "Processing... (Extracting PDF and calling Gemini)";
+
+        const formdata = new FormData();
+        formdata.append("file", file);
+
+        try {
+            // 1. Upload
+            await fetch("/upload", { method: "POST", body: formdata });
+
+            // 2. Ask
+            const response = await fetch("/ask", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ "question": question, "api_key": apiKey })
+            });
+
+            const data = await response.json();
+            // Handle cases where the response might be an error or the result object
+            resultDiv.innerHTML = "<strong>Answer:</strong> " + (data.answer.answer || data.answer);
+        } catch (error) {
+            resultDiv.innerHTML = "Error: " + error.message;
+        }
+    }
+    </script>
+</body>
+</html> 
