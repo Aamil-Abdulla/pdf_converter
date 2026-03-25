@@ -1,52 +1,82 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html>
 <head>
-    <title>PDF Converter</title>
+    <title>PDF Chatbot</title>
 </head>
 <body>
-    <h1>PDF Converter</h1>
-    <input type="file" id="FileInput">
-    <input type="text" id="Question" placeholder="Ask a question about the PDF">
-    <input type="password" id="ApiKey" placeholder="Enter Gemini API Key">
-    
-    <button onclick="upload()">Upload & Ask</button>
+    <h1>PDF Chatbot</h1>
+    <input type="file" id="FileInput" accept=".pdf">
+    <br><br>
+    <input type="text" id="Question" placeholder="Ask a question about the PDF" style="width:300px">
+    <br><br>
+    <input type="password" id="ApiKey" placeholder="Enter Gemini API Key" style="width:300px">
+    <br><br>
+    <button onclick="upload()">Upload PDF First</button>
+    <button onclick="ask()">Ask Question</button>
+
     <div id="Result" style="margin-top: 20px; white-space: pre-wrap;"></div>
 
     <script>
-    async function upload(){
+    // Step 1: Upload the PDF separately
+    async function upload() {
         const resultDiv = document.getElementById("Result");
         const file = document.getElementById("FileInput").files[0];
-        const question = document.getElementById("Question").value;
-        const apiKey = document.getElementById("ApiKey").value;
 
-        if(!file || !question || !apiKey) {
-            alert("Please provide a file, a question, and your API key.");
+        if (!file) {
+            alert("Please select a PDF file.");
             return;
         }
 
-        resultDiv.innerHTML = "Processing... (Extracting PDF and calling Gemini)";
+        resultDiv.innerHTML = "Uploading and processing PDF... please wait.";
 
         const formdata = new FormData();
         formdata.append("file", file);
 
         try {
-            // 1. Upload
-            await fetch("/upload", { method: "POST", body: formdata });
+            const res = await fetch("/upload", { method: "POST", body: formdata });
+            const data = await res.json();
 
-            // 2. Ask
+            if (!res.ok) {
+                resultDiv.innerHTML = "Upload Error: " + data.detail;
+            } else {
+                resultDiv.innerHTML = "✅ " + data.message + " — Now type your question and click Ask.";
+            }
+        } catch (error) {
+            resultDiv.innerHTML = "Upload failed: " + error.message;
+        }
+    }
+
+    // Step 2: Ask the question separately
+    async function ask() {
+        const resultDiv = document.getElementById("Result");
+        const question = document.getElementById("Question").value;
+        const apiKey = document.getElementById("ApiKey").value;
+
+        if (!question || !apiKey) {
+            alert("Please enter a question and your API key.");
+            return;
+        }
+
+        resultDiv.innerHTML = "Thinking... asking Gemini...";
+
+        try {
             const response = await fetch("/ask", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ "question": question, "api_key": apiKey })
+                body: JSON.stringify({ question: question, api_key: apiKey })
             });
 
             const data = await response.json();
-            // Handle cases where the response might be an error or the result object
-            resultDiv.innerHTML = "<strong>Answer:</strong> " + (data.answer.answer || data.answer);
+
+            if (!response.ok) {
+                resultDiv.innerHTML = "Error: " + data.detail;
+            } else {
+                resultDiv.innerHTML = "Answer: " + data.answer;
+            }
         } catch (error) {
             resultDiv.innerHTML = "Error: " + error.message;
         }
     }
     </script>
 </body>
-</html> 
+</html>

@@ -8,11 +8,13 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 def extract_text(file_path):
     text = ""
-    Pdf_reader = PyPDF2.PdfReader(file_path)
-    for page in Pdf_reader.pages:
-        text += page.extract_text()
-    print(f"Extracted text length: {len(text)}")  # add this
-    print(f"First 200 chars: {text[:200]}")        # add this
+    pdf_reader = PyPDF2.PdfReader(file_path, strict=False)
+    for page in pdf_reader.pages:
+        extracted = page.extract_text()
+        if extracted:  
+            text += extracted
+    print(f"Extracted text length: {len(text)}")
+    print(f"First 200 chars: {text[:200]}")
     return text
 
 def get_text_chunks(text):
@@ -21,7 +23,7 @@ def get_text_chunks(text):
     return chunks
 
 def get_vector_store(chunks):
-    embeddings= HuggingFaceEmbeddings(model_name = "sentence-transformers/all-MiniLM-L6-v2")
+    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
     vector_store = FAISS.from_texts(chunks, embedding=embeddings)
     vector_store.save_local("faiss_index")
 
@@ -29,24 +31,21 @@ def get_answer(user_question, api_key):
     embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
     db = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
     docs = db.similarity_search(user_question)
-    
-    # Try adding the 'models/' prefix explicitly if you haven't yet
+
     model1 = ChatGoogleGenerativeAI(
-    model="models/gemini-1.5-flash", 
-    google_api_key=api_key,
-    convert_system_message_to_human=True # Helpful for older library versions
+        model="gemini-2.5-flash",  
+        google_api_key=api_key
+
     )
-    
+
     prompt_template = """
     Context: {context}
     Question: {question}
-    
+
     If the relevant topic cannot be found in the context, strictly say "I'm sorry, but I don't have information on that topic."
     Answer:
     """
     prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
     chain = create_stuff_documents_chain(llm=model1, prompt=prompt)
-    
-    # This calls the Google API
     result = chain.invoke({"context": docs, "question": user_question})
     return result
