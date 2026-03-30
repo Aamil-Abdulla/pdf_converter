@@ -1,44 +1,42 @@
-import os
-from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import PromptTemplate
 from langchain.chains.combine_documents import create_stuff_documents_chain
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 import PyPDF2
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 def extract_text(file_path):
     text = ""
-    # Using 'rb' mode is safer for PDF reading
-    with open(file_path, "rb") as f:
-        pdf_reader = PyPDF2.PdfReader(f, strict=False)
-        for page in pdf_reader.pages:
-            extracted = page.extract_text()
-            if extracted:  
-                text += extracted
+    pdf_reader = PyPDF2.PdfReader(file_path, strict=False)
+    for page in pdf_reader.pages:
+        extracted = page.extract_text()
+        if extracted:  
+            text += extracted
+    print(f"Extracted text length: {len(text)}")
+    print(f"First 200 chars: {text[:200]}")
     return text
 
 def get_text_chunks(text):
-    # Reduced chunk size slightly for better retrieval precision
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     chunks = text_splitter.split_text(text)
     return chunks
 
-def get_vector_store(chunks, api_key):
-    # FIX: Using Google Embeddings to save Render RAM
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=api_key)
+def get_vector_store(chunks):
+    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
     vector_store = FAISS.from_texts(chunks, embedding=embeddings)
     vector_store.save_local("faiss_index")
 
 def get_answer(user_question, api_key):
-    # FIX: Must use the same embedding model for loading that you used for saving
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=api_key)
-    
-    # Load the index
+    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
     db = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
-    docs = db.similarity_search(user_question, k=3) # Get top 3 chunks
+    docs = db.similarity_search(user_question)
 
-    # Use Gemini Flash for speed
-    llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=api_key)
+    model1 = ChatGoogleGenerativeAI(
+        model="gemini-2.5-flash",  
+        google_api_key=api_key
+
+    )
 
     prompt_template = """
     Context: {context}
@@ -48,8 +46,6 @@ def get_answer(user_question, api_key):
     Answer:
     """
     prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
-    chain = create_stuff_documents_chain(llm=llm, prompt=prompt)
-    
-    # Invoke the chain
+    chain = create_stuff_documents_chain(llm=model1, prompt=prompt)
     result = chain.invoke({"context": docs, "question": user_question})
     return result
