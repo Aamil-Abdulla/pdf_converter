@@ -1,13 +1,12 @@
-from fastapi import FastAPI, UploadFile, HTTPException
+from fastapi import FastAPI, UploadFile, HTTPException, Form
 from fastapi.responses import HTMLResponse
 from rag import extract_text, get_text_chunks, get_vector_store, get_answer
 from pydantic import BaseModel
 import os
-
 app = FastAPI()
 
 @app.post("/upload")
-async def upload_pdf(file: UploadFile):
+async def upload_pdf(file: UploadFile , api_key: str = Form(...)):
 
     if not file.filename.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are allowed.")
@@ -25,7 +24,7 @@ async def upload_pdf(file: UploadFile):
         raise HTTPException(status_code=400, detail="Could not extract text from PDF. Is it a scanned image?")
     
     chunks = get_text_chunks(text)
-    get_vector_store(chunks)
+    get_vector_store(chunks, api_key)
     return {"message": "PDF uploaded and processed successfully."}
 
 @app.get("/")

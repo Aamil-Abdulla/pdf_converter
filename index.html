@@ -21,16 +21,22 @@
     async function upload() {
         const resultDiv = document.getElementById("Result");
         const file = document.getElementById("FileInput").files[0];
+        const apiKey = document.getElementById("ApiKey").value;
+    
 
         if (!file) {
             alert("Please select a PDF file.");
             return;
         }
-
+        if (!apiKey) {
+            alert("Please enter your API key.");
+            return;
+        }
         resultDiv.innerHTML = "Uploading and processing PDF... please wait.";
 
         const formdata = new FormData();
         formdata.append("file", file);
+        formdata.append("api_key", apiKey);
 
         try {
             const res = await fetch("/upload", { method: "POST", body: formdata });
